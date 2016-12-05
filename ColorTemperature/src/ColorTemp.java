@@ -3,7 +3,7 @@ import java.math.*;
 public class ColorTemp {
 
 	// CIE standard observer, 360nm to 830nm, 5nm increments
-	public static final double[][] CIE_STANDARD_OBSERVER = {{0.0001299, 0.000003917, 0.0006061},
+	private static final double[][] CIE_STANDARD_OBSERVER = {{0.0001299, 0.000003917, 0.0006061},
 		    {0.0002321, 0.000006965, 0.001086}, {0.0004149, 0.00001239, 0.001946}, {0.0007416, 0.00002202, 0.003486},
 		    {0.001368, 0.000039, 0.006450001}, {0.002236, 0.000064, 0.01054999}, {0.004243, 0.000120, 0.02005001},
 		    {0.007650, 0.000217, 0.036210}, {0.014310, 0.000396, 0.06785001}, {0.023190, 0.000640, 0.110200},
@@ -37,16 +37,16 @@ public class ColorTemp {
 		    {0.000003581652, 0.0000012934, 0.000000}, {0.000002522525, 0.00000091093, 0.000000}, {0.000001776509, 0.00000064153, 0.000000},
 		    {0.000001251141, 0.00000045181, 0.000000}};
 
-	public static final Point INFINTE_TEMP_XY = infinitelyHotXY();
-	public static final Point BLUEST_POINT = monochromeToXY(415);
-	public static final Point REDDEST_POINT = monochromeToXY(700);
-	public static final Line NEGATIVE_TEMP_LINE = new Line(BLUEST_POINT, INFINTE_TEMP_XY);
-	public static final Line MAGENTA_LINE = new Line(BLUEST_POINT, REDDEST_POINT);
+	private static final Point INFINTE_TEMP_XY = infinitelyHotXY();
+	private static final Point BLUEST_POINT = monochromeToXY(415);
+	private static final Point REDDEST_POINT = monochromeToXY(700);
+	private static final Line NEGATIVE_TEMP_LINE = new Line(BLUEST_POINT, INFINTE_TEMP_XY);
+	private static final Line MAGENTA_LINE = new Line(BLUEST_POINT, REDDEST_POINT);
 	
-	public static final XYInterpolationPoint[] INTERP_TABLE = createInterpolationTable();
+	private static final XYInterpolationPoint[] INTERP_TABLE = createInterpolationTable();
 	
 	// yields a blackbody radiator sprectrum; lambda is measured in nanometers; temp is measured in Kelvin
-	public static double plancksLaw(double temp, double lambda) {
+	private static double plancksLaw(double temp, double lambda) {
 		double h = 6.62607004e-34;
 		double c = 299792458;
 		double k = 1.38064852e-23;
@@ -55,7 +55,7 @@ public class ColorTemp {
 		return 2*h*c*c/(wl*wl*wl*wl*wl)/(Math.exp(h*c/(k*wl*temp))-1);
 	}
 	
-	public static Point infinitelyHotXY() {
+	private static Point infinitelyHotXY() {
 		double X = 0;
 		double Y = 0;
 		double Z = 0;
@@ -73,7 +73,7 @@ public class ColorTemp {
 	
 	
 	// input is in Kelvin
-	public static Point tempToXY(double temp) {
+	private static Point tempToXY(double temp) {
 		double X = 0;
 		double Y = 0;
 		double Z = 0;
@@ -90,7 +90,7 @@ public class ColorTemp {
 	}
 	
 	//input is in nanometers
-	public static Point monochromeToXY(double wavelength) {
+	private static Point monochromeToXY(double wavelength) {
 		if(wavelength < 360 || wavelength > 830) {
 			throw new IllegalArgumentException("Wavelength is not between 560nm and 830nm. Wavelength is " + wavelength);
 		} else if(wavelength==830) {
@@ -120,7 +120,7 @@ public class ColorTemp {
 	
 	// input is in nanometers
 	// output is in Kelvin
-	public static double findCCTForMonochrome(double wavelength, double initialGuess) {
+	private static double findCCTForMonochrome(double wavelength, double initialGuess) {
 		Point mono_xy = monochromeToXY(wavelength);
 		Point planckian_xy = tempToXY(initialGuess);
 		Line perpToPlanck = new Line(planckian_xy, -1/slopePlanckianLocus(initialGuess));
@@ -155,7 +155,7 @@ public class ColorTemp {
 	
 	// the table will have entries from 420nm to 695nm, in 5nm increments
 	// temperature will be in mireds
-	public static XYInterpolationPoint[] createInterpolationTable() {
+	private static XYInterpolationPoint[] createInterpolationTable() {
 		final int minWl = 420;
 		final int maxWl = 695;
 		XYInterpolationPoint[] table = new XYInterpolationPoint[(maxWl-minWl)/5 + 1]; 
@@ -185,7 +185,7 @@ public class ColorTemp {
 
 	
 	// input is in Kelvin
-	public static double slopePlanckianLocus(double temp) {
+	private static double slopePlanckianLocus(double temp) {
 		Point xy1 = tempToXY(0.98 * temp);
 		Point xy2 = tempToXY(1.02 * temp);
 		return xy1.slope2(xy2);
@@ -195,7 +195,7 @@ public class ColorTemp {
 		return getTemperatureCoordinate(new Point(x,y));
 	}
 
-	public static TemperatureCoordinate getTemperatureCoordinate(Point xy) {
+	private static TemperatureCoordinate getTemperatureCoordinate(Point xy) {
 		for(int i=0; i<INTERP_TABLE.length-1; i++) {
 			Line planckSegment = new Line(INTERP_TABLE[i].PLANCKIAN_XY, INTERP_TABLE[i+1].PLANCKIAN_XY);
 			Ray leftVertical;
@@ -258,7 +258,7 @@ public class ColorTemp {
 		}
 	}
 
-	public static double lerp(double origin, double destination, double percentage) {
+	private static double lerp(double origin, double destination, double percentage) {
 		return origin + percentage * (destination-origin);
 	}
 }
