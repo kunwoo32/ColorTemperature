@@ -190,6 +190,10 @@ public class ColorTemp {
 		Point xy2 = tempToXY(1.02 * temp);
 		return xy1.slope2(xy2);
 	}
+	
+	public static TemperatureCoordinate getTemperatureCoordinate(double x, double y) {
+		return getTemperatureCoordinate(new Point(x,y));
+	}
 
 	public static TemperatureCoordinate getTemperatureCoordinate(Point xy) {
 		for(int i=0; i<INTERP_TABLE.length-1; i++) {
