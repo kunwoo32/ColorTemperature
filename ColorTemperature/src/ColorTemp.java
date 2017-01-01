@@ -190,12 +190,20 @@ public class ColorTemp {
 		Point xy2 = tempToXY(1.02 * temp);
 		return xy1.slope2(xy2);
 	}
+
+	// shifts the temperature of the color
+	// temperature measured in mireds
+	// can return results outside the range of physically possible colors
+	public static Point shiftColorTemperature(Point color, double temperature) {
+		TemperatureCoordinate tc = getTemperatureCoordinate(color);
+		return getXYFromTemperatureCoordinate(new TemperatureCoordinate(tc.temperature+temperature, tc.tint));
+	}
 	
 	public static TemperatureCoordinate getTemperatureCoordinate(double x, double y) {
 		return getTemperatureCoordinate(new Point(x,y));
 	}
 
-	private static TemperatureCoordinate getTemperatureCoordinate(Point xy) {
+	public static TemperatureCoordinate getTemperatureCoordinate(Point xy) {
 		for(int i=0; i<INTERP_TABLE.length-1; i++) {
 			Line planckSegment = new Line(INTERP_TABLE[i].PLANCKIAN_XY, INTERP_TABLE[i+1].PLANCKIAN_XY);
 			Ray leftVertical;
@@ -218,22 +226,23 @@ public class ColorTemp {
 				return new TemperatureCoordinate(temperature, displ*tintSign);
 			}
 		}
-		
+
+		// if the point is at one of the two extreme corners
 		Line bluestPlanckSegment = new Line(BLUEST_POINT, INTERP_TABLE[0].PLANCKIAN_XY);
 		Line bluestVerticalAbove = new Line(INTERP_TABLE[0].PLANCKIAN_XY, monochromeToXY(INTERP_TABLE[0].WAVELENGTH));
-		Line bluestVerticalBelow = new Line(INTERP_TABLE[0].PLANCKIAN_XY, INTERP_TABLE[0].MAGENTA_XY);
+		Ray bluestVerticalBelow = new Ray(INTERP_TABLE[0].PLANCKIAN_XY, INTERP_TABLE[0].MAGENTA_XY);
 		
 		if(bluestPlanckSegment.isBelow(xy) && bluestVerticalAbove.isRightOf(xy)) { // top bluest sector
 			double tint = bluestPlanckSegment.shortestDistance(xy);
 			double planckLength = BLUEST_POINT.distance(INTERP_TABLE[0].PLANCKIAN_XY);
-			double distXYToVertical = bluestVerticalAbove.shortestDistance(xy);
+			double distXYToVertical = bluestVerticalAbove.shortestDistance(xy); // bluestVerticalAbove is always perpendicular to bluestPlanckSegment
 			double temperature = INTERP_TABLE[0].TEMPERATURE*planckLength/(planckLength-distXYToVertical);
 			return new TemperatureCoordinate(temperature, tint);
 		} else if(!bluestPlanckSegment.isBelow(xy) && bluestVerticalBelow.isRightOf(xy)) { // bottom bluest sector
 			double tint = -bluestPlanckSegment.shortestDistance(xy);
 			double planckLength = BLUEST_POINT.distance(INTERP_TABLE[0].PLANCKIAN_XY);
-			double distXYToVertical = bluestVerticalAbove.shortestDistance(xy);
-			double temperature = INTERP_TABLE[0].TEMPERATURE*planckLength/(planckLength-distXYToVertical);
+			Point p = bluestVerticalBelow.moveFromInitial(Math.abs(-tint/Math.sin(bluestVerticalBelow.angle-bluestPlanckSegment.slope)));
+			double temperature = INTERP_TABLE[0].TEMPERATURE*planckLength/(planckLength-p.distance(xy));
 			return new TemperatureCoordinate(temperature, tint);
 		} else {
 			int lastI = INTERP_TABLE.length-1;
@@ -256,6 +265,56 @@ public class ColorTemp {
 			double temperature = INTERP_TABLE[lastI].TEMPERATURE * planckDistance / (planckDistance - p.distance(xy));
 			return new TemperatureCoordinate(temperature, displ*tintSign);
 		}
+	}
+
+	public static Point getXYFromTemperatureCoordinate(TemperatureCoordinate tc) {
+		for(int i=0; i<INTERP_TABLE.length-1; i++) {
+			if(tc.temperature > INTERP_TABLE[i].TEMPERATURE && tc.temperature < INTERP_TABLE[i+1].TEMPERATURE) {
+				Ray leftVertical;
+				Ray rightVertical;
+				Line planckSegment = new Line(INTERP_TABLE[i].PLANCKIAN_XY, INTERP_TABLE[i + 1].PLANCKIAN_XY);
+				if (tc.tint > 0) {
+					leftVertical = new Ray(INTERP_TABLE[i].PLANCKIAN_XY, monochromeToXY(INTERP_TABLE[i].WAVELENGTH));
+					rightVertical = new Ray(INTERP_TABLE[i + 1].PLANCKIAN_XY, monochromeToXY(INTERP_TABLE[i + 1].WAVELENGTH));
+				} else {
+					leftVertical = new Ray(INTERP_TABLE[i].PLANCKIAN_XY, INTERP_TABLE[i].MAGENTA_XY);
+					rightVertical = new Ray(INTERP_TABLE[i + 1].PLANCKIAN_XY, INTERP_TABLE[i + 1].MAGENTA_XY);
+				}
+				double displacement = Math.abs(tc.tint);
+				Point pLeft = leftVertical.moveFromInitial(Math.abs(displacement / Math.sin(leftVertical.angle - Math.atan(planckSegment.slope))));
+				Point pRight = rightVertical.moveFromInitial(Math.abs(displacement / Math.sin(rightVertical.angle - Math.atan(planckSegment.slope))));
+				return pLeft.lerp(pRight, (tc.temperature - INTERP_TABLE[i].TEMPERATURE) / (INTERP_TABLE[i + 1].TEMPERATURE - INTERP_TABLE[i].TEMPERATURE));
+			}
+		}
+
+		// if point is at one of th two extreme corners
+		int lastI = INTERP_TABLE.length-1;
+		Ray planckSegment;
+		Ray vertical;
+		XYInterpolationPoint interpP;
+		double planckLength;
+
+		if(tc.temperature <= INTERP_TABLE[0].TEMPERATURE) { // bluest corner
+			interpP = INTERP_TABLE[0];
+			planckSegment = new Ray(interpP.PLANCKIAN_XY, BLUEST_POINT);
+			planckLength = interpP.PLANCKIAN_XY.distance(BLUEST_POINT);
+		} else if(tc.temperature >= INTERP_TABLE[lastI].TEMPERATURE){ // reddest corner
+			interpP = INTERP_TABLE[lastI];
+			planckSegment = new Ray(interpP.PLANCKIAN_XY, REDDEST_POINT);
+			planckLength = interpP.PLANCKIAN_XY.distance(REDDEST_POINT);
+		} else {
+			throw new IllegalArgumentException("TemperatureCoordinate has impossible temperature.");
+		}
+
+		if(tc.tint > 0) {
+			vertical = new Ray(interpP.PLANCKIAN_XY, monochromeToXY(interpP.WAVELENGTH));
+		} else {
+			vertical = new Ray(interpP.PLANCKIAN_XY, interpP.MAGENTA_XY);
+		}
+
+		double displacement = Math.abs(tc.tint);
+		Point p = vertical.moveFromInitial(Math.abs(displacement/Math.sin(vertical.angle-planckSegment.angle)));
+		return planckSegment.moveParallel(p, planckLength*(1-interpP.TEMPERATURE/tc.temperature));
 	}
 
 	private static double lerp(double origin, double destination, double percentage) {
